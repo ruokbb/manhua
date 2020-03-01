@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from scrapy_redis.spiders import RedisSpider
-import redis
 from manhua.items import HomePageItem
 import re
 import time
