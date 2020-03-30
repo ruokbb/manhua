@@ -40,3 +40,14 @@ class manhua_info(scrapy.Item):
 class manhua_download(scrapy.Item):
     total_chapters = scrapy.Field()
     id = scrapy.Field()
+
+class image_download(scrapy.Item):
+    image_urls = scrapy.Field()
+    images = scrapy.Field()
+    is_old = scrapy.Field()
+    image_index = scrapy.Field()
+    chapter_index = scrapy.Field()
+    chapter_name = scrapy.Field()
+    id = scrapy.Field()
+    name = scrapy.Field()
+    Referer = scrapy.Field()

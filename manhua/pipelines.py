@@ -5,6 +5,11 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 import redis
+from scrapy.pipelines.images import ImagesPipeline
+import scrapy
+from manhua.items import manhua_download
+import json
+import pymysql
 
 class ManhuaPipeline(object):
 
@@ -73,15 +78,37 @@ class ManhuaPipeline(object):
 class InfoPipeline(object):
     def open_spider(self,spider):
         self.conn = redis.Redis(host='139.199.0.99',port=6379,password='SHIqixin5682318!',db=5)
+        self.mysql_conn = pymysql.connect(host='139.199.0.99',user='root',password='root',port=3306,database='rrmh',
+                             charset='utf8')
 
     def close_spider(self,spider):
         self.conn.close()
+        self.mysql_conn.close()
 
     def process_item(self, item, spider):
         if spider.name != 'dmzj_search_info':
             return item
 
+        #判断之前是否已收录
+        a = self.conn.sismember('idIncluded',item['id'])
+        if a:
+            item['included'] = 1
+        else:
+            item['included'] = 0
+            self.conn.sadd('idIncluded',item['id'])
+
+        #封装json传入数据库
+        temp = json.dumps(item)
+        cursor = self.mysql_conn.cursor()
+        # sql = 'INSERT INTO json_cart_info VALUES (' + pymysql.escape_string(temp) + ')'
+        cursor.execute('INSERT INTO json_cart_info (json) VALUES (%s)',(str(temp)))
+        self.mysql_conn.commit()
+        cursor.close()
+
+
+     #调整逻辑对应存入接口
         #根据情况重置manhua_url，和dmzj_search_all：items,重新爬取更新信息
+        #可能存在异步的错误，慎重
         if self.conn.llen('dmzj_search_info:start_url')==0:
 
             a = self.conn.smembers('manhua_url')
@@ -95,7 +122,6 @@ class InfoPipeline(object):
 
             self.conn.ltrim('dmzj_search_all：items',1,0)
 
-        return item
 
 
 class DownloadPipeline(object):
@@ -106,7 +132,7 @@ class DownloadPipeline(object):
         self.conn.close()
 
     def process_item(self, item, spider):
-        if spider.name != 'download':
+        if not isinstance(item,manhua_download):
             return item
 
         #爬取一遍之后重新填充start_url
@@ -118,6 +144,13 @@ class DownloadPipeline(object):
 
             self.conn.ltrim('download：items',1,0)
 
-        self.conn.hset('idToNum',item['id'],item['total_chapters'])
+        self.conn.hset('idToNum',item['id'],int(item['total_chapters']))
 
         return item
+
+
+class DownloadImagePipeline(ImagesPipeline):
+    def get_media_requests(self, item, info):
+        for i in item['image_urls']:
+            header = {"Referer": item['Referer']}
+            yield scrapy.Request(i, headers=header)

@@ -62,6 +62,7 @@ SPIDER_MIDDLEWARES = {
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
+    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
     'manhua.middlewares.UserAgentMiddleware': 543,
     'scrapy_splash.SplashCookiesMiddleware': 723,
     'scrapy_splash.SplashMiddleware': 725,
@@ -77,7 +78,7 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'scrapy_redis.pipelines.RedisPipeline': 300,
+    'scrapy_redis.pipelines.RedisPipeline': 500,
     'manhua.pipelines.ManhuaPipeline': 299,
     'manhua.pipelines.InfoPipeline': 301,
     'manhua.pipelines.DownloadPipeline': 302,

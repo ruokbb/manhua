@@ -4,7 +4,7 @@ from scrapy_redis.spiders import RedisSpider
 from urllib.parse import urljoin
 import re
 import json
-from manhua.items import manhua_download
+from manhua.items import manhua_download,image_download
 import redis
 from scrapy_splash import SplashRequest
 
@@ -17,30 +17,35 @@ class DownloadSpider(RedisSpider):
     def parse(self, response):
         info = response.xpath('//div[@class="anim-main_list"]/table/tr')
         data = response.body.decode('utf-8', 'ignore')
-        item = {}
+        item = dict()
         if len(info) > 2:  # 旧界面
             pat = 'id="comic_id">(.*?)<'
             id = re.compile(pat).findall(data)[0]
             url = 'https://v3api.dmzj.com/comic/comic_' + str(id) + '.json'
             item['is_old'] = 1
         else:  # 新界面
-            pat = 'obj_id.=."(.*?)"'
+            pat = 'obj_id = "(.*?)"'
             id = re.compile(pat).findall(data)[0]
             url = 'https://v3api.dmzj.com/comic/comic_' + str(id) + '.json'
             item['is_old'] = 0
 
+        item['Referer'] = response.url
         yield scrapy.Request(url, callback=self.next, meta={'item': item}, dont_filter=True)
 
     def next(self, response):
         jsondata = json.loads(response.body)
-        item = {}
+        item = image_download()
         item['is_old'] = response.meta['item']['is_old']
+        item['Referer'] = response.meta['item']['Referer']
         scrapy_item = manhua_download()
         chapters_info = jsondata['chapters'][0]['data']
         scrapy_item['total_chapters'] = len(chapters_info)
         scrapy_item['id'] = int(jsondata['id'])
+
         conn = redis.Redis(host='139.199.0.99', port=6379, password='SHIqixin5682318!', db=5)
         redis_total_chapters = conn.hget('idToNum', int(jsondata['id']))
+        conn.close()
+
         if redis_total_chapters:
             if redis_total_chapters >= len(chapters_info):  # 无新章节
                 return
@@ -64,15 +69,15 @@ class DownloadSpider(RedisSpider):
     def find_imageurls(self, response):
         images = response.xpath('//div[@class="btmBtnBox"]/select/option/@value').extract()
         item = response.meta['item']
-        header = {"Referer": response.url}
+        item['Referer'] = response.url
         image_index = 0
         if item['is_old']:
             for i in images:
+                image_urls = []
                 url = urljoin("https://", i)
-                item['image_index'] = image_index
-                image_index += 1
-                yield scrapy.Request(url, headers=header, callback=self.download, meta={"item": item}, dont_filter=True)
+                image_urls.append(url)
 
-    def download(self, response):
-        item = response.meta['item']
-        item['image'] = response.body
+                item['image_index'] = image_index
+                item['image_urls'] = image_urls
+                yield item
+                image_index += 1
