@@ -10,9 +10,6 @@ class SearchAllSpider(RedisSpider):
     allowed_domains = ['dmzj.com']
     redis_key = 'dmzj_search_all:start_url'
     redis_batch_size = 1
-    custom_settings = {
-        'CLOSESPIDER_TIMEOUT' : 3600
-    }
 
     def parse(self, response):
 
