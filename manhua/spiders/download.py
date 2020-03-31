@@ -10,27 +10,38 @@ from scrapy_splash import SplashRequest
 
 
 class DownloadSpider(RedisSpider):
-    name = 'download'
+    name = 'dmzj_download'
     allowed_domains = ['dmzj.com']
     redis_key = 'download:start_url'
+    redis_batch_size = 5
 
     def parse(self, response):
         info = response.xpath('//div[@class="anim-main_list"]/table/tr')
         data = response.body.decode('utf-8', 'ignore')
         item = dict()
+        item['Referer'] = response.url
         if len(info) > 2:  # 旧界面
             pat = 'id="comic_id">(.*?)<'
             id = re.compile(pat).findall(data)[0]
             url = 'https://v3api.dmzj.com/comic/comic_' + str(id) + '.json'
             item['is_old'] = 1
+            yield scrapy.Request(url, callback=self.next, meta={'item': item}, dont_filter=True)
         else:  # 新界面
-            pat = 'obj_id = "(.*?)"'
-            id = re.compile(pat).findall(data)[0]
-            url = 'https://v3api.dmzj.com/comic/comic_' + str(id) + '.json'
-            item['is_old'] = 0
+            yield SplashRequest(response.url, callback=self.new_html, meta={'item': item}, dont_filter=True)
 
-        item['Referer'] = response.url
+    def new_html(self,response):
+        data = response.body.decode('utf-8','ignore')
+        item = response.meta['item']
+        try:
+            pat = 'other_subscribe\((.*?),'
+            id = re.compile(pat).findall(data)[0]
+        except IndexError as e:
+            print('新网页又找不到id')
+            return
+        url = 'https://v3api.dmzj.com/comic/comic_' + str(id) + '.json'
+        item['is_old'] = 0
         yield scrapy.Request(url, callback=self.next, meta={'item': item}, dont_filter=True)
+
 
     def next(self, response):
         jsondata = json.loads(response.body)

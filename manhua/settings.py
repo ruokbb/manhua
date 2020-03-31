@@ -82,6 +82,7 @@ ITEM_PIPELINES = {
     'manhua.pipelines.ManhuaPipeline': 299,
     'manhua.pipelines.InfoPipeline': 301,
     'manhua.pipelines.DownloadPipeline': 302,
+    'manhua.pipelines.DownloadImagePipeline': 302,
 
 }
 
@@ -109,3 +110,5 @@ ITEM_PIPELINES = {
 SPLASH_URL = 'http://139.199.0.99:8050'
 
 HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
+
+IMAGES_STORE = './images'

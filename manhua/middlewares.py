@@ -123,5 +123,4 @@ class UserAgentMiddleware(object):
 
     def process_request(self,request,spider):
         request.headers['USER_AGENT'] = random.choice(self.user_agent_list)
-        if spider.name =='dmzj_search_all':
-            time.sleep(random.randint(0,1))
+        time.sleep(random.randint(0,2))

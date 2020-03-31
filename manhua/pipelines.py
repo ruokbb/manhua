@@ -10,6 +10,9 @@ import scrapy
 from manhua.items import manhua_download
 import json
 import pymysql
+from scrapy.exceptions import DropItem
+import os
+import ctypes
 
 class ManhuaPipeline(object):
 
@@ -32,6 +35,7 @@ class ManhuaPipeline(object):
         #检查网页
         self.url_set(item['name'],item['total_number'],item['page'])
 
+        raise DropItem('爬取成功')
 
     def close_spider(self,spider):
         self.conn.close()
@@ -121,7 +125,7 @@ class InfoPipeline(object):
                 self.conn.lpush('manhua_info', i)
 
             self.conn.ltrim('dmzj_search_all：items',1,0)
-
+        raise DropItem('爬取成功')
 
 
 class DownloadPipeline(object):
@@ -150,7 +154,54 @@ class DownloadPipeline(object):
 
 
 class DownloadImagePipeline(ImagesPipeline):
+    def open_spider(self,spider):
+        super().open_spider(spider)
+        self.conn = redis.Redis(host='139.199.0.99',port=6379,password='SHIqixin5682318!',db=5)
+        self.mysql_conn = pymysql.connect(host='139.199.0.99', user='root', password='root', port=3306, database='rrmh',
+                                          charset='utf8')
+
+    def close_spider(self,spider):
+        self.conn.close()
+        self.mysql_conn.close()
+
     def get_media_requests(self, item, info):
         for i in item['image_urls']:
             header = {"Referer": item['Referer']}
-            yield scrapy.Request(i, headers=header)
+            a = self.conn.sismember('image_urls',i)
+            if a:
+                continue
+            else:
+                yield scrapy.Request(i, headers=header)
+
+    def item_completed(self, results, item, info):
+        images = [(x['url'],x['path']) for ok,x in results if ok]
+        if images:
+            for i in images:
+                #调用C接口
+                project_dir = os.path.dirname(__file__)
+                image_dir = project_dir + '/images/' + i[1]
+                c_path = project_dir+'/libfdfs_upload_file.so'
+                libc = ctypes.cdll.LoadLibrary(c_path)
+                myUpload = libc.myUpload    #取函数
+                myUpload.restype = ctypes.c_int #定义函数返回值
+                #三个参数
+                confFile = bytes('/etc/fdfs/client.conf',encoding='utf-8')
+                localFile = bytes(image_dir,encoding='utf-8')
+                fileID = ctypes.create_string_buffer(20)
+                a = myUpload(confFile,localFile,fileID)
+                if a:
+                    # redis录入去重
+                    self.conn.sadd('image_urls', i[0])
+                    # 传入数据库
+                    data = dict(item)
+                    data['iamge_id'] = str(fileID.value)
+                    json_data = json.dumps(data)
+                    cursor = self.mysql_conn.cursor()
+                    cursor.execute('INSERT INTO json_page (json) VALUES (%s)', (str(json_data)))
+                    self.mysql_conn.commit()
+                    cursor.close()
+                #删除照片
+                os.remove(image_dir)
+            return item
+        else:
+            raise DropItem('图片下载失败')
