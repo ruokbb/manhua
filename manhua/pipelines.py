@@ -177,29 +177,35 @@ class DownloadImagePipeline(ImagesPipeline):
         images = [(x['url'],x['path']) for ok,x in results if ok]
         if images:
             for i in images:
+                print('图片下载成功')
                 #调用C接口
-                project_dir = os.path.dirname(__file__)
+                project_dir = '/home/ubuntu/manhua_spider/manhua'
                 image_dir = project_dir + '/images/' + i[1]
-                c_path = project_dir+'/libfdfs_upload_file.so'
-                libc = ctypes.cdll.LoadLibrary(c_path)
+                c_path1 = project_dir+'/libfdfs_upload_file.so'
+                c_path2 = '/usr/lib/libfdfsclient.so'
+                ctypes.CDLL(c_path2, mode=ctypes.RTLD_GLOBAL)#预加载
+                libc = ctypes.cdll.LoadLibrary(c_path1)
                 myUpload = libc.myUpload    #取函数
                 myUpload.restype = ctypes.c_int #定义函数返回值
                 #三个参数
                 confFile = bytes('/etc/fdfs/client.conf',encoding='utf-8')
                 localFile = bytes(image_dir,encoding='utf-8')
-                fileID = ctypes.create_string_buffer(20)
+                fileID = ctypes.create_string_buffer(80)
                 a = myUpload(confFile,localFile,fileID)
-                if a:
+                if a==0:
                     # redis录入去重
                     self.conn.sadd('image_urls', i[0])
                     # 传入数据库
                     data = dict(item)
-                    data['iamge_id'] = str(fileID.value)
+                    data['image_id'] = str(fileID.value)
                     json_data = json.dumps(data)
                     cursor = self.mysql_conn.cursor()
                     cursor.execute('INSERT INTO json_page (json) VALUES (%s)', (str(json_data)))
                     self.mysql_conn.commit()
                     cursor.close()
+                    print('图片上传成功')
+                else:
+                    print('图片上传失败')
                 #删除照片
                 os.remove(image_dir)
             return item

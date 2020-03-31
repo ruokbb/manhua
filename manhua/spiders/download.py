@@ -13,7 +13,7 @@ class DownloadSpider(RedisSpider):
     name = 'dmzj_download'
     allowed_domains = ['dmzj.com']
     redis_key = 'download:start_url'
-    redis_batch_size = 5
+    redis_batch_size = 10
 
     def parse(self, response):
         info = response.xpath('//div[@class="anim-main_list"]/table/tr')
