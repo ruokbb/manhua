@@ -9,7 +9,6 @@ class SearchInfoSpider(RedisSpider):
     name = 'dmzj_search_info'
     allowed_domains = ['dmzj.com']
     redis_key = 'dmzj_search_info:start_url'
-    redis_batch_size = 10
 
     def parse(self, response):
         data = response.body.decode('utf-8','ignore')

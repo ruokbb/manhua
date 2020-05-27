@@ -177,7 +177,6 @@ class DownloadImagePipeline(ImagesPipeline):
         images = [(x['url'],x['path']) for ok,x in results if ok]
         if images:
             for i in images:
-                print('图片下载成功')
                 #调用C接口
                 project_dir = '/home/ubuntu/manhua_spider/manhua'
                 image_dir = project_dir + '/images/' + i[1]
